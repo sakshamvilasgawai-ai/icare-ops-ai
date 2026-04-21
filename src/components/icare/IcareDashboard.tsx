@@ -100,6 +100,8 @@ const initialHospitals: HospitalRecord[] = [
       { id: 2, name: "Insulin", category: "Endocrine", quantity: 310, threshold: 140, expiry: "2026-08-04", usage: [21, 24, 26, 27, 31, 33, 35] },
       { id: 3, name: "Adrenaline", category: "Emergency", quantity: 62, threshold: 80, expiry: "2026-03-11", usage: [8, 10, 12, 11, 13, 15, 18] },
     ],
+    storage: createStorage(820, 92, "Nagpur"),
+    staffMembers: createStaffMembers("Nagpur"),
   },
   {
     id: 2,
@@ -120,6 +122,8 @@ const initialHospitals: HospitalRecord[] = [
       { id: 1, name: "Meropenem", category: "Antibiotic", quantity: 92, threshold: 160, expiry: "2026-04-24", usage: [36, 38, 44, 49, 55, 63, 70] },
       { id: 2, name: "Dopamine", category: "Critical Care", quantity: 48, threshold: 70, expiry: "2026-02-28", usage: [12, 13, 12, 16, 18, 21, 24] },
     ],
+    storage: createStorage(2478, 312, "New Delhi"),
+    staffMembers: createStaffMembers("New Delhi"),
   },
   {
     id: 3,
@@ -140,6 +144,8 @@ const initialHospitals: HospitalRecord[] = [
       { id: 1, name: "Paracetamol IV", category: "Analgesic", quantity: 540, threshold: 220, expiry: "2026-09-08", usage: [48, 50, 53, 56, 58, 59, 62] },
       { id: 2, name: "Piperacillin", category: "Antibiotic", quantity: 118, threshold: 150, expiry: "2026-06-02", usage: [22, 29, 31, 36, 39, 44, 49] },
     ],
+    storage: createStorage(620, 76, "Mumbai"),
+    staffMembers: createStaffMembers("Mumbai"),
   },
   {
     id: 4,
@@ -160,6 +166,8 @@ const initialHospitals: HospitalRecord[] = [
       { id: 1, name: "Oseltamivir", category: "Antiviral", quantity: 126, threshold: 100, expiry: "2026-07-17", usage: [12, 16, 19, 24, 31, 37, 45] },
       { id: 2, name: "Salbutamol", category: "Respiratory", quantity: 78, threshold: 120, expiry: "2026-03-30", usage: [18, 21, 25, 28, 34, 39, 43] },
     ],
+    storage: createStorage(700, 88, "Chennai"),
+    staffMembers: createStaffMembers("Chennai"),
   },
 ];
 
