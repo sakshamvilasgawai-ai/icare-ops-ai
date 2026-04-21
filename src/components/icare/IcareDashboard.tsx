@@ -371,11 +371,20 @@ export default function IcareDashboard() {
     ...eventLog.slice(0, 2),
   ];
 
-  const forecastData = useMemo(() => [
-    { hour: "6h", patients: Math.max(0, Math.round((historicalAverage * 0.34 + hospital.occupancy * 0.32) * seasonalIndex - scenario.diverted)), confidence: 94 },
-    { hour: "12h", patients: Math.max(0, Math.round((historicalAverage * 0.62 + hospital.occupancy * 0.48) * seasonalIndex - scenario.diverted * 1.8)), confidence: 89 },
-    { hour: "24h", patients: Math.max(0, Math.round((historicalAverage * 1.15 + hospital.occupancy * 0.82) * seasonalIndex - scenario.diverted * 2.4)), confidence: 84 },
-  ], [historicalAverage, hospital.occupancy, scenario.diverted, seasonalIndex]);
+  const forecastData = useMemo(() => {
+    const capacity = Math.max(1, hospital.beds);
+    const horizons = [
+      { hour: "6h", base: historicalAverage * 0.34 + hospital.occupancy * 0.32, divertWeight: 1, confidence: 94 },
+      { hour: "12h", base: historicalAverage * 0.62 + hospital.occupancy * 0.48, divertWeight: 1.8, confidence: 89 },
+      { hour: "24h", base: historicalAverage * 1.15 + hospital.occupancy * 0.82, divertWeight: 2.4, confidence: 84 },
+    ];
+    return horizons.map(({ hour, base, divertWeight, confidence }) => {
+      const patients = Math.max(0, Math.round(base * seasonalIndex - scenario.diverted * divertWeight));
+      const load = Math.round((patients / capacity) * 220 + hospital.occupancy * 0.3);
+      const risk = getRisk(load);
+      return { hour, patients, confidence, load, risk };
+    });
+  }, [historicalAverage, hospital.beds, hospital.occupancy, scenario.diverted, seasonalIndex]);
 
   const allocationPlan = useMemo(() => {
     const nextInflow = forecastData[2].patients;
@@ -557,9 +566,25 @@ export default function IcareDashboard() {
 
           {activeTab === "ops" ? (
             <div className="grid gap-4 p-4 xl:grid-cols-3">
-              <Panel title="AI Forecasting Engine" icon={Activity}>
-                <div className="h-64"><ResponsiveContainer><AreaChart data={forecastData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="hour" /><YAxis /><Tooltip /><Area type="monotone" dataKey="patients" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.22)" /><Area type="monotone" dataKey="confidence" stroke="hsl(var(--safe))" fill="hsl(var(--safe) / 0.14)" /></AreaChart></ResponsiveContainer></div>
-                <div className="grid grid-cols-3 gap-2 text-center text-sm">{forecastData.map((item) => <div key={item.hour} className="rounded-md bg-secondary p-2"><strong>{item.patients}</strong><p className="text-muted-foreground">{item.hour} · {item.confidence}%</p></div>)}</div>
+              <Panel title="AI Prediction Engine" icon={Sparkles} action={<span className="rounded-full bg-secondary px-2 py-1 text-xs text-secondary-foreground">Patient inflow forecast</span>}>
+                <div className="h-56"><ResponsiveContainer><AreaChart data={forecastData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="hour" /><YAxis /><Tooltip /><Area type="monotone" dataKey="patients" stroke="hsl(var(--primary))" fill="hsl(var(--primary) / 0.22)" /><Area type="monotone" dataKey="confidence" stroke="hsl(var(--safe))" fill="hsl(var(--safe) / 0.14)" /></AreaChart></ResponsiveContainer></div>
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {forecastData.map((item) => (
+                    <div key={item.hour} className="rounded-lg border border-border bg-secondary/60 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold uppercase text-muted-foreground">Next {item.hour}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${riskClass[item.risk]}`}>{titleCase(item.risk)}</span>
+                      </div>
+                      <strong className="mt-1 block text-2xl text-foreground">{item.patients}</strong>
+                      <p className="text-xs text-muted-foreground">predicted admissions</p>
+                      <div className="mt-2">
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground"><span>Confidence</span><span>{item.confidence}%</span></div>
+                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${item.confidence}%` }} /></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-3 rounded-md bg-secondary p-2 text-xs text-secondary-foreground">Model blends historical inflow ({historicalAverage}/day) with seasonal index {seasonalIndex.toFixed(2)} and live occupancy. Risk reflects projected load vs. capacity.</p>
               </Panel>
               <Panel title="Resource Optimization" icon={Bed}>
                 <div className="h-64"><ResponsiveContainer><BarChart data={usageData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="value" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" /></BarChart></ResponsiveContainer></div>
