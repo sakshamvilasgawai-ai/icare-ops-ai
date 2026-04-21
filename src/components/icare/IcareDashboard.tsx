@@ -47,6 +47,9 @@ type Risk = "safe" | "warning" | "critical";
 type AmbulanceStatus = "Available" | "Busy" | "En Route";
 type Medicine = { id: number; name: string; category: string; quantity: number; threshold: number; expiry: string; usage: number[] };
 type AmbulanceUnit = { id: string; driver: string; status: AmbulanceStatus; location: string; eta: number; performance: number };
+type StorageArea = "Beds" | "ICU" | "Equipment";
+type StorageItem = { id: number; area: StorageArea; name: string; quantity: number; available: number; location: string; address: string; updatedAt: string };
+type StaffMember = { id: number; name: string; role: string; shiftTime: string; address: string; status: "On Duty" | "Standby" | "Off Duty" };
 type HospitalRecord = {
   id: number;
   name: string;
@@ -60,7 +63,20 @@ type HospitalRecord = {
   nurses: number;
   ambulances: AmbulanceUnit[];
   medicines: Medicine[];
+  storage: StorageItem[];
+  staffMembers: StaffMember[];
 };
+
+const createStorage = (beds: number, icu: number, city: string): StorageItem[] => [
+  { id: beds + icu + 1, area: "Beds", name: "General ward beds", quantity: beds, available: Math.round(beds * 0.22), location: "Ward block A", address: `Main campus, ${city}`, updatedAt: "08:00" },
+  { id: beds + icu + 2, area: "ICU", name: "ICU beds with monitors", quantity: icu, available: Math.max(2, Math.round(icu * 0.16)), location: "Critical care unit", address: `ICU tower, ${city}`, updatedAt: "08:15" },
+  { id: beds + icu + 3, area: "Equipment", name: "Ventilators", quantity: Math.round(icu * 0.55), available: Math.max(1, Math.round(icu * 0.12)), location: "Equipment store", address: `Biomedical wing, ${city}`, updatedAt: "08:30" },
+];
+
+const createStaffMembers = (city: string): StaffMember[] => [
+  { id: Date.now() - 3, name: "Dr. Ananya Rao", role: "Emergency Physician", shiftTime: "08:00-16:00", address: `Staff quarters, ${city}`, status: "On Duty" },
+  { id: Date.now() - 2, name: "Nurse Vikram Shah", role: "ICU Nurse", shiftTime: "14:00-22:00", address: `Nursing hostel, ${city}`, status: "Standby" },
+];
 
 const initialHospitals: HospitalRecord[] = [
   {
@@ -84,6 +100,8 @@ const initialHospitals: HospitalRecord[] = [
       { id: 2, name: "Insulin", category: "Endocrine", quantity: 310, threshold: 140, expiry: "2026-08-04", usage: [21, 24, 26, 27, 31, 33, 35] },
       { id: 3, name: "Adrenaline", category: "Emergency", quantity: 62, threshold: 80, expiry: "2026-03-11", usage: [8, 10, 12, 11, 13, 15, 18] },
     ],
+    storage: createStorage(820, 92, "Nagpur"),
+    staffMembers: createStaffMembers("Nagpur"),
   },
   {
     id: 2,
@@ -104,6 +122,8 @@ const initialHospitals: HospitalRecord[] = [
       { id: 1, name: "Meropenem", category: "Antibiotic", quantity: 92, threshold: 160, expiry: "2026-04-24", usage: [36, 38, 44, 49, 55, 63, 70] },
       { id: 2, name: "Dopamine", category: "Critical Care", quantity: 48, threshold: 70, expiry: "2026-02-28", usage: [12, 13, 12, 16, 18, 21, 24] },
     ],
+    storage: createStorage(2478, 312, "New Delhi"),
+    staffMembers: createStaffMembers("New Delhi"),
   },
   {
     id: 3,
@@ -124,6 +144,8 @@ const initialHospitals: HospitalRecord[] = [
       { id: 1, name: "Paracetamol IV", category: "Analgesic", quantity: 540, threshold: 220, expiry: "2026-09-08", usage: [48, 50, 53, 56, 58, 59, 62] },
       { id: 2, name: "Piperacillin", category: "Antibiotic", quantity: 118, threshold: 150, expiry: "2026-06-02", usage: [22, 29, 31, 36, 39, 44, 49] },
     ],
+    storage: createStorage(620, 76, "Mumbai"),
+    staffMembers: createStaffMembers("Mumbai"),
   },
   {
     id: 4,
@@ -144,6 +166,8 @@ const initialHospitals: HospitalRecord[] = [
       { id: 1, name: "Oseltamivir", category: "Antiviral", quantity: 126, threshold: 100, expiry: "2026-07-17", usage: [12, 16, 19, 24, 31, 37, 45] },
       { id: 2, name: "Salbutamol", category: "Respiratory", quantity: 78, threshold: 120, expiry: "2026-03-30", usage: [18, 21, 25, 28, 34, 39, 43] },
     ],
+    storage: createStorage(700, 88, "Chennai"),
+    staffMembers: createStaffMembers("Chennai"),
   },
 ];
 
@@ -251,6 +275,8 @@ export default function IcareDashboard() {
   const [scenario, setScenario] = useState({ beds: 0, staff: 0, diverted: 0 });
   const [newMed, setNewMed] = useState({ name: "", quantity: 0, threshold: 50, category: "General", expiry: "2026-12-31" });
   const [newHospital, setNewHospital] = useState({ name: "", state: "Karnataka", city: "Bengaluru", beds: 400, icu: 48, staff: 260 });
+  const [newStorage, setNewStorage] = useState({ area: "Equipment" as StorageArea, name: "", quantity: 1, available: 1, location: "Central store", address: "" });
+  const [newStaff, setNewStaff] = useState({ name: "", role: "Nurse", shiftTime: "08:00-16:00", address: "", status: "On Duty" as StaffMember["status"] });
   const [eventLog, setEventLog] = useState<string[]>(["AI watchtower active across selected region", "Morning shift validated 18 minutes ago"]);
 
   const hospital = hospitals.find((item) => item.id === selectedId) || hospitals[0];
@@ -315,6 +341,21 @@ export default function IcareDashboard() {
 
   const deleteMedicine = (id: number) => updateHospital((record) => ({ ...record, medicines: record.medicines.filter((medicine) => medicine.id !== id) }));
 
+  const addStorageItem = () => {
+    if (!newStorage.name.trim()) return;
+    updateHospital((record) => ({
+      ...record,
+      storage: [...record.storage, { id: Date.now(), ...newStorage, updatedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }],
+    }));
+    setNewStorage({ area: "Equipment", name: "", quantity: 1, available: 1, location: "Central store", address: "" });
+  };
+
+  const addStaffMember = () => {
+    if (!newStaff.name.trim()) return;
+    updateHospital((record) => ({ ...record, staffMembers: [...record.staffMembers, { id: Date.now(), ...newStaff }] }));
+    setNewStaff({ name: "", role: "Nurse", shiftTime: "08:00-16:00", address: "", status: "On Duty" });
+  };
+
   const addHospital = () => {
     if (!newHospital.name.trim()) return;
     setHospitals((items) => [...items, {
@@ -330,6 +371,8 @@ export default function IcareDashboard() {
       nurses: Math.round(newHospital.staff * 0.68),
       ambulances: [{ id: `${newHospital.city.slice(0, 2).toUpperCase()}-NEW-1`, driver: "Unassigned", status: "Available", location: "Main gate", eta: 10, performance: 80 }],
       medicines: [],
+      storage: createStorage(newHospital.beds, newHospital.icu, newHospital.city),
+      staffMembers: createStaffMembers(newHospital.city),
     }]);
     setEventLog((items) => [`${newHospital.name} added to command network`, ...items]);
   };
@@ -347,6 +390,7 @@ export default function IcareDashboard() {
       `Staff availability: ${staffAvailability}%`,
       `Forecast 24h: ${forecastData[2].patients} admissions (${forecastData[2].confidence}% confidence)`,
       `Low stock medicines: ${lowStock.map((m) => m.name).join(", ") || "None"}`,
+      `Storage records: ${hospital.storage.length}; Staff members: ${hospital.staffMembers.length}`,
       `Top recommendation: ${adjustedIcu > 88 ? "Activate ICU surge and divert stable patients" : "Maintain standby staffing"}`,
     ];
     rows.forEach((row, index) => doc.text(row, 14, 42 + index * 9));
@@ -358,6 +402,8 @@ export default function IcareDashboard() {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ hospital: hospital.name, adjustedOccupancy, adjustedIcu, edPressure, staffAvailability }]), "KPIs");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(forecastData), "Predictions");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.medicines), "Medicine Inventory");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.storage), "Beds ICU Equipment");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.staffMembers), "Staff Members");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.ambulances), "Ambulances");
     XLSX.writeFile(workbook, `icare-${hospital.name.replace(/\s+/g, "-").toLowerCase()}-snapshot.xlsx`);
   };
@@ -430,6 +476,9 @@ export default function IcareDashboard() {
               <Panel title="Ambulance Intelligence" icon={Ambulance} action={<Button variant="emergency" size="sm" onClick={dispatchAmbulance}><Ambulance className="h-4 w-4" />Dispatch nearest</Button>}>
                 <div className="space-y-2">{hospital.ambulances.map((unit) => <div key={unit.id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm"><div><strong>{unit.id}</strong><p className="text-muted-foreground">{unit.driver} · {unit.location}</p></div><div className="text-right"><span className={`rounded-full px-2 py-1 text-xs ${unit.status === "Available" ? riskClass.safe : unit.status === "En Route" ? riskClass.warning : riskClass.critical}`}>{unit.status}</span><p className="mt-1 text-muted-foreground">ETA {unit.eta}m</p></div></div>)}</div>
               </Panel>
+              <Panel title="Beds, ICU & Equipment Storage" icon={Stethoscope}>
+                <div className="space-y-2">{hospital.storage.map((item) => <div key={item.id} className="rounded-md border border-border p-3 text-sm"><div className="flex items-center justify-between gap-2"><strong>{item.area}: {item.name}</strong><span className={`rounded-full px-2 py-1 text-xs ${item.available < 3 ? riskClass.critical : item.available < 8 ? riskClass.warning : riskClass.safe}`}>{item.available}/{item.quantity} free</span></div><p className="mt-1 text-muted-foreground">{item.location} · {item.address} · Updated {item.updatedAt}</p></div>)}</div>
+              </Panel>
               <Panel title="Real-time Alerts" icon={AlertTriangle}>
                 <div className="space-y-2">{alerts.map((alert, index) => <div key={`${alert}-${index}`} className="flex gap-3 rounded-md border border-border p-3 text-sm"><AlertTriangle className={`mt-0.5 h-4 w-4 ${index < 2 ? "text-critical" : "text-warning"}`} /><div><strong>{index < 2 ? "High urgency" : "Watch"}</strong><p className="text-muted-foreground">{alert}</p></div></div>)}</div>
               </Panel>
@@ -448,8 +497,9 @@ export default function IcareDashboard() {
               <Panel title="Admin Overview" icon={Building2}><div className="grid grid-cols-2 gap-2 text-sm"><div className="rounded-md bg-secondary p-3"><strong>{hospitals.length}</strong><p>Total hospitals</p></div><div className="rounded-md bg-secondary p-3"><strong>{Math.round(hospitals.reduce((s, h) => s + h.occupancy, 0) / hospitals.length)}%</strong><p>Network utilization</p></div><div className="rounded-md bg-secondary p-3"><strong>{alerts.length}</strong><p>Alerts</p></div><div className="rounded-md bg-secondary p-3"><strong>3</strong><p>User roles</p></div></div></Panel>
               <Panel title="Hospital Management" icon={Hospital}><div className="grid gap-2"><input className="rounded-md border border-input bg-background p-2" placeholder="Hospital name" value={newHospital.name} onChange={(e) => setNewHospital((s) => ({ ...s, name: e.target.value }))} /><div className="grid grid-cols-2 gap-2"><input className="rounded-md border border-input bg-background p-2" value={newHospital.state} onChange={(e) => setNewHospital((s) => ({ ...s, state: e.target.value }))} /><input className="rounded-md border border-input bg-background p-2" value={newHospital.city} onChange={(e) => setNewHospital((s) => ({ ...s, city: e.target.value }))} /></div><div className="grid grid-cols-3 gap-2"><input type="number" className="rounded-md border border-input bg-background p-2" value={newHospital.beds} onChange={(e) => setNewHospital((s) => ({ ...s, beds: Number(e.target.value) }))} /><input type="number" className="rounded-md border border-input bg-background p-2" value={newHospital.icu} onChange={(e) => setNewHospital((s) => ({ ...s, icu: Number(e.target.value) }))} /><input type="number" className="rounded-md border border-input bg-background p-2" value={newHospital.staff} onChange={(e) => setNewHospital((s) => ({ ...s, staff: Number(e.target.value) }))} /></div><Button variant="clinical" onClick={addHospital}><Plus className="h-4 w-4" />Add hospital</Button></div></Panel>
               <Panel title="Ambulance Management" icon={Ambulance}><div className="space-y-2">{hospital.ambulances.map((unit) => <div key={unit.id} className="rounded-md bg-secondary p-3 text-sm"><strong>{unit.id}</strong><p>{unit.driver} · Performance {unit.performance}%</p></div>)}<Button variant="export" onClick={() => updateHospital((record) => ({ ...record, ambulances: [...record.ambulances, { id: `AMB-${Date.now().toString().slice(-4)}`, driver: "New driver", status: "Available", location: "Base", eta: 12, performance: 82 }] }))}><Plus className="h-4 w-4" />Add ambulance</Button></div></Panel>
-              <Panel title="Staff Management" icon={Users}><div className="space-y-2 text-sm"><p className="rounded-md bg-secondary p-3">Doctors: {hospital.doctors}; Nurses: {hospital.nurses}; burnout risk {staffAvailability < 65 ? "elevated" : "controlled"}.</p><p className="rounded-md bg-secondary p-3">AI scheduling: add 2 ICU nurses and 1 emergency physician to next shift.</p></div></Panel>
+              <Panel title="Staff Management" icon={Users}><div className="space-y-2 text-sm"><p className="rounded-md bg-secondary p-3">Doctors: {hospital.doctors}; Nurses: {hospital.nurses}; burnout risk {staffAvailability < 65 ? "elevated" : "controlled"}.</p>{hospital.staffMembers.map((member) => <div key={member.id} className="rounded-md border border-border p-3"><div className="flex items-center justify-between gap-2"><strong>{member.name}</strong><span className="rounded-full bg-secondary px-2 py-1 text-xs">{member.status}</span></div><p className="text-muted-foreground">{member.role} · {member.shiftTime} · {member.address}</p></div>)}<div className="grid gap-2"><input className="rounded-md border border-input bg-background p-2" placeholder="Staff member name" value={newStaff.name} onChange={(e) => setNewStaff((s) => ({ ...s, name: e.target.value }))} /><div className="grid grid-cols-2 gap-2"><input className="rounded-md border border-input bg-background p-2" placeholder="Role" value={newStaff.role} onChange={(e) => setNewStaff((s) => ({ ...s, role: e.target.value }))} /><input className="rounded-md border border-input bg-background p-2" placeholder="Shift time" value={newStaff.shiftTime} onChange={(e) => setNewStaff((s) => ({ ...s, shiftTime: e.target.value }))} /></div><input className="rounded-md border border-input bg-background p-2" placeholder="Address" value={newStaff.address} onChange={(e) => setNewStaff((s) => ({ ...s, address: e.target.value }))} /><Button variant="clinical" onClick={addStaffMember}><Plus className="h-4 w-4" />Add staff member</Button></div></div></Panel>
               <Panel title="Medicine Management" icon={Pill}><div className="grid gap-2"><input className="rounded-md border border-input bg-background p-2" placeholder="Medicine name" value={newMed.name} onChange={(e) => setNewMed((s) => ({ ...s, name: e.target.value }))} /><div className="grid grid-cols-2 gap-2"><input className="rounded-md border border-input bg-background p-2" value={newMed.category} onChange={(e) => setNewMed((s) => ({ ...s, category: e.target.value }))} /><input className="rounded-md border border-input bg-background p-2" type="date" value={newMed.expiry} onChange={(e) => setNewMed((s) => ({ ...s, expiry: e.target.value }))} /></div><div className="grid grid-cols-2 gap-2"><input type="number" className="rounded-md border border-input bg-background p-2" value={newMed.quantity} onChange={(e) => setNewMed((s) => ({ ...s, quantity: Number(e.target.value) }))} /><input type="number" className="rounded-md border border-input bg-background p-2" value={newMed.threshold} onChange={(e) => setNewMed((s) => ({ ...s, threshold: Number(e.target.value) }))} /></div><Button variant="clinical" onClick={addMedicine}><Plus className="h-4 w-4" />Add medicine</Button></div></Panel>
+              <Panel title="Beds, ICU & Equipment Options" icon={Bed}><div className="grid gap-2"><select className="rounded-md border border-input bg-background p-2" value={newStorage.area} onChange={(e) => setNewStorage((s) => ({ ...s, area: e.target.value as StorageArea }))}><option>Beds</option><option>ICU</option><option>Equipment</option></select><input className="rounded-md border border-input bg-background p-2" placeholder="Item name" value={newStorage.name} onChange={(e) => setNewStorage((s) => ({ ...s, name: e.target.value }))} /><div className="grid grid-cols-2 gap-2"><input type="number" className="rounded-md border border-input bg-background p-2" value={newStorage.quantity} onChange={(e) => setNewStorage((s) => ({ ...s, quantity: Number(e.target.value) }))} /><input type="number" className="rounded-md border border-input bg-background p-2" value={newStorage.available} onChange={(e) => setNewStorage((s) => ({ ...s, available: Number(e.target.value) }))} /></div><input className="rounded-md border border-input bg-background p-2" placeholder="Storage location" value={newStorage.location} onChange={(e) => setNewStorage((s) => ({ ...s, location: e.target.value }))} /><input className="rounded-md border border-input bg-background p-2" placeholder="Address" value={newStorage.address} onChange={(e) => setNewStorage((s) => ({ ...s, address: e.target.value }))} /><Button variant="clinical" onClick={addStorageItem}><Plus className="h-4 w-4" />Add storage item</Button></div></Panel>
               <Panel title="Data Management" icon={Upload}><div className="space-y-2 text-sm"><label className="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-dashed border-border p-6"><Upload className="h-5 w-5" />Upload CSV / Excel<input type="file" accept=".csv,.xlsx" className="hidden" onChange={(e) => setEventLog((items) => [`Validated data file: ${e.target.files?.[0]?.name || "upload"}`, ...items])} /></label><p className="rounded-md bg-secondary p-3">Validation preview checks missing beds, duplicate ambulances, expiry dates, and abnormal inflow spikes.</p></div></Panel>
               <Panel title="Alert Config, AI Settings & Roles" icon={Stethoscope}><div className="space-y-3 text-sm"><label className="block">Prediction sensitivity<input type="range" min="1" max="10" defaultValue="7" className="mt-1 w-full accent-primary" /></label><label className="block">Alert frequency<input type="range" min="1" max="10" defaultValue="6" className="mt-1 w-full accent-primary" /></label><div className="grid grid-cols-3 gap-2 text-center"><span className="rounded-md bg-secondary p-2">Admin</span><span className="rounded-md bg-secondary p-2">Manager</span><span className="rounded-md bg-secondary p-2">Staff</span></div></div></Panel>
               <Panel title="Reports & Export" icon={FileSpreadsheet}><div className="grid gap-2"><Button variant="clinical" onClick={exportPdf}><Download className="h-4 w-4" />Generate PDF report</Button><Button variant="export" onClick={exportExcel}><FileSpreadsheet className="h-4 w-4" />Export structured Excel</Button><p className="text-sm text-muted-foreground">Snapshots include KPIs, predictions, medicines, resources, ambulances, and recommendations.</p></div></Panel>
