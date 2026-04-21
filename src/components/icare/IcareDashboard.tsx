@@ -323,6 +323,11 @@ export default function IcareDashboard() {
   const staffAvailability = Math.max(42, Math.round(100 - hospital.occupancy * 0.42 + scenario.staff * 0.18));
   const adjustedOccupancy = Math.max(20, Math.round(hospital.occupancy - scenario.beds * 0.12 - scenario.diverted * 0.22));
   const adjustedIcu = Math.max(20, Math.round(hospital.icuOccupancy - scenario.beds * 0.05 - scenario.diverted * 0.14));
+  const historicalAverage = Math.round(hospital.historicalRecords.reduce((sum, item) => sum + item.inflow, 0) / hospital.historicalRecords.length);
+  const seasonalIndex = hospital.historicalRecords.at(-1)?.seasonalIndex || 1;
+  const availableBeds = hospital.storage.filter((item) => item.area === "Beds").reduce((sum, item) => sum + item.available, 0) + scenario.beds;
+  const availableIcu = hospital.storage.filter((item) => item.area === "ICU").reduce((sum, item) => sum + item.available, 0) + Math.round(scenario.beds * 0.12);
+  const availableStaffMembers = hospital.staffMembers.filter((member) => member.status !== "Off Duty").length + scenario.staff;
   const lowStock = hospital.medicines.filter((medicine) => medicine.quantity <= medicine.threshold);
   const expiring = hospital.medicines.filter((medicine) => new Date(medicine.expiry).getTime() - Date.now() < 1000 * 60 * 60 * 24 * 90);
   const edPressure = Math.round((adjustedOccupancy + adjustedIcu + (100 - staffAvailability)) / 3);
@@ -335,10 +340,34 @@ export default function IcareDashboard() {
   ];
 
   const forecastData = useMemo(() => [
-    { hour: "6h", patients: Math.round(38 + hospital.occupancy * 0.42 - scenario.diverted), confidence: 94 },
-    { hour: "12h", patients: Math.round(74 + hospital.occupancy * 0.64 - scenario.diverted * 1.8), confidence: 89 },
-    { hour: "24h", patients: Math.round(148 + hospital.occupancy * 1.05 - scenario.diverted * 2.4), confidence: 84 },
-  ], [hospital.occupancy, scenario.diverted]);
+    { hour: "6h", patients: Math.max(0, Math.round((historicalAverage * 0.34 + hospital.occupancy * 0.32) * seasonalIndex - scenario.diverted)), confidence: 94 },
+    { hour: "12h", patients: Math.max(0, Math.round((historicalAverage * 0.62 + hospital.occupancy * 0.48) * seasonalIndex - scenario.diverted * 1.8)), confidence: 89 },
+    { hour: "24h", patients: Math.max(0, Math.round((historicalAverage * 1.15 + hospital.occupancy * 0.82) * seasonalIndex - scenario.diverted * 2.4)), confidence: 84 },
+  ], [historicalAverage, hospital.occupancy, scenario.diverted, seasonalIndex]);
+
+  const allocationPlan = useMemo(() => {
+    const nextInflow = forecastData[2].patients;
+    const requiredBeds = Math.max(0, Math.ceil(nextInflow * 0.58 - availableBeds));
+    const requiredIcu = Math.max(0, Math.ceil(nextInflow * 0.16 - availableIcu));
+    const requiredStaff = Math.max(0, Math.ceil(nextInflow / 9 - availableStaffMembers));
+    const diversionTarget = hospitals
+      .filter((item) => item.id !== hospital.id)
+      .sort((a, b) => a.occupancy + a.icuOccupancy - (b.occupancy + b.icuOccupancy))[0];
+
+    return {
+      requiredBeds,
+      requiredIcu,
+      requiredStaff,
+      diversionTarget,
+      risk: requiredBeds + requiredIcu + requiredStaff > 18 ? "critical" as Risk : requiredBeds + requiredIcu + requiredStaff > 6 ? "warning" as Risk : "safe" as Risk,
+      recommendations: [
+        requiredBeds ? `Open ${requiredBeds} surge beds from ward storage before the 24h peak.` : "Current bed capacity can absorb predicted inflow.",
+        requiredIcu ? `Reserve ${requiredIcu} ICU slots and move stable cases to step-down beds.` : "ICU reserve is adequate for predicted critical arrivals.",
+        requiredStaff ? `Add ${requiredStaff} staff members to intake and ICU shifts.` : "Current active staff covers predicted workload.",
+        diversionTarget ? `Route overflow to ${diversionTarget.name} if ED pressure exceeds ${Math.max(82, edPressure)}%.` : "No diversion target available in network.",
+      ],
+    };
+  }, [availableBeds, availableIcu, availableStaffMembers, edPressure, forecastData, hospital.id, hospitals]);
 
   const usageData = [
     { name: "Beds", value: adjustedOccupancy },
@@ -411,6 +440,7 @@ export default function IcareDashboard() {
       medicines: [],
       storage: createStorage(newHospital.beds, newHospital.icu, newHospital.city),
       staffMembers: createStaffMembers(newHospital.city),
+      historicalRecords: createHistoricalRecords(61, 58),
     }]);
     setEventLog((items) => [`${newHospital.name} added to command network`, ...items]);
   };
