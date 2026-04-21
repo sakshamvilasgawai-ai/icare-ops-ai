@@ -457,9 +457,10 @@ export default function IcareDashboard() {
       `ED pressure: ${edPressure}%`,
       `Staff availability: ${staffAvailability}%`,
       `Forecast 24h: ${forecastData[2].patients} admissions (${forecastData[2].confidence}% confidence)`,
+      `Allocation risk: ${titleCase(allocationPlan.risk)}; beds needed ${allocationPlan.requiredBeds}; ICU needed ${allocationPlan.requiredIcu}; staff needed ${allocationPlan.requiredStaff}`,
       `Low stock medicines: ${lowStock.map((m) => m.name).join(", ") || "None"}`,
       `Storage records: ${hospital.storage.length}; Staff members: ${hospital.staffMembers.length}`,
-      `Top recommendation: ${adjustedIcu > 88 ? "Activate ICU surge and divert stable patients" : "Maintain standby staffing"}`,
+      `Top recommendation: ${allocationPlan.recommendations[0]}`,
     ];
     rows.forEach((row, index) => doc.text(row, 14, 42 + index * 9));
     doc.save(`icare-${hospital.name.replace(/\s+/g, "-").toLowerCase()}-snapshot.pdf`);
@@ -469,6 +470,8 @@ export default function IcareDashboard() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ hospital: hospital.name, adjustedOccupancy, adjustedIcu, edPressure, staffAvailability }]), "KPIs");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(forecastData), "Predictions");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ ...allocationPlan, diversionTarget: allocationPlan.diversionTarget?.name || "None" }]), "Allocation Plan");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.historicalRecords), "Historical Records");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.medicines), "Medicine Inventory");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.storage), "Beds ICU Equipment");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.staffMembers), "Staff Members");
@@ -528,13 +531,16 @@ export default function IcareDashboard() {
               </Panel>
               <Panel title="Resource Optimization" icon={Bed}>
                 <div className="h-64"><ResponsiveContainer><BarChart data={usageData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="value" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" /></BarChart></ResponsiveContainer></div>
-                <p className="rounded-md bg-secondary p-3 text-sm text-secondary-foreground">Expected impact: +{scenario.beds} beds and +{scenario.staff} staff reduce ED pressure to {edPressure}%.</p>
+                <div className="space-y-2 text-sm">
+                  <div className={`rounded-md p-3 ${riskClass[allocationPlan.risk]}`}>AI allocation: {allocationPlan.requiredBeds} beds, {allocationPlan.requiredIcu} ICU slots, {allocationPlan.requiredStaff} staff needed for {forecastData[2].patients} predicted admissions.</div>
+                  {allocationPlan.recommendations.slice(0, 3).map((item) => <p key={item} className="rounded-md bg-secondary p-2 text-secondary-foreground">{item}</p>)}
+                </div>
               </Panel>
               <Panel title="Insights & Severity" icon={Sparkles}>
                 <div className="h-48"><ResponsiveContainer><PieChart><Pie data={severity} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75}>{severity.map((_, index) => <Cell key={index} fill={["hsl(var(--critical))", "hsl(var(--warning))", "hsl(var(--safe))"][index]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div>
                 <div className="space-y-2 text-sm">
-                  <p className="rounded-md bg-secondary p-2">{adjustedIcu > 88 ? "Activate surge ICU and divert moderate cases." : "Keep current triage route and standby beds."}</p>
-                  <p className="rounded-md bg-secondary p-2">Redistribute {Math.max(8, Math.round((100 - staffAvailability) / 2))} nurses to emergency intake.</p>
+                  <p className="rounded-md bg-secondary p-2">Historical inflow avg {historicalAverage}/day with seasonal index {seasonalIndex.toFixed(2)} drives current forecast.</p>
+                  <p className="rounded-md bg-secondary p-2">{allocationPlan.recommendations[3]}</p>
                 </div>
               </Panel>
               <Panel title="Medicine Storage & Analysis" icon={Pill}>
