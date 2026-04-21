@@ -350,7 +350,7 @@ export default function IcareDashboard() {
       `Top recommendation: ${adjustedIcu > 88 ? "Activate ICU surge and divert stable patients" : "Maintain standby staffing"}`,
     ];
     rows.forEach((row, index) => doc.text(row, 14, 42 + index * 9));
-    doc.save(`icare-${hospital.name.replaceAll(" ", "-").toLowerCase()}-snapshot.pdf`);
+    doc.save(`icare-${hospital.name.replace(/\s+/g, "-").toLowerCase()}-snapshot.pdf`);
   };
 
   const exportExcel = () => {
@@ -359,7 +359,7 @@ export default function IcareDashboard() {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(forecastData), "Predictions");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.medicines), "Medicine Inventory");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.ambulances), "Ambulances");
-    XLSX.writeFile(workbook, `icare-${hospital.name.replaceAll(" ", "-").toLowerCase()}-snapshot.xlsx`);
+    XLSX.writeFile(workbook, `icare-${hospital.name.replace(/\s+/g, "-").toLowerCase()}-snapshot.xlsx`);
   };
 
   return (
