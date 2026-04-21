@@ -310,6 +310,23 @@ function FloatingCopilot({ hospital, alerts, dispatchAmbulance }: { hospital: Ho
               <div key={`${message.text}-${index}`} className={`rounded-lg p-2 text-sm ${message.from === "ai" ? "bg-secondary text-secondary-foreground" : "bg-accent text-accent-foreground"}`}>{message.text}</div>
             ))}
           </div>
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              onSend(input);
+            }}
+            className="flex items-center gap-2"
+          >
+            <input
+              type="text"
+              value={input}
+              onChange={(event) => setInput(event.target.value)}
+              placeholder="Ask about beds, ICU, staff, stock…"
+              className="h-9 flex-1 rounded-md border border-input bg-background px-2 text-sm outline-none focus:ring-2 focus:ring-ring"
+              aria-label="Message Icare Co-pilot"
+            />
+            <Button type="submit" variant="clinical" size="sm" disabled={!input.trim()}>Send</Button>
+          </form>
           <div className="grid grid-cols-2 gap-2">
             <Button variant="clinical" size="sm" onClick={() => onSend("What needs action now?")}><Sparkles className="h-4 w-4" />Ask</Button>
             <Button variant="emergency" size="sm" onClick={dispatchAmbulance}><Ambulance className="h-4 w-4" />Dispatch</Button>
