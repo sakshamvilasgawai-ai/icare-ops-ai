@@ -50,6 +50,7 @@ type AmbulanceUnit = { id: string; driver: string; status: AmbulanceStatus; loca
 type StorageArea = "Beds" | "ICU" | "Equipment";
 type StorageItem = { id: number; area: StorageArea; name: string; quantity: number; available: number; location: string; address: string; updatedAt: string };
 type StaffMember = { id: number; name: string; role: string; shiftTime: string; address: string; status: "On Duty" | "Standby" | "Off Duty" };
+type HistoricalRecord = { day: string; inflow: number; bedUse: number; icuUse: number; staffLoad: number; seasonalIndex: number };
 type HospitalRecord = {
   id: number;
   name: string;
@@ -65,6 +66,7 @@ type HospitalRecord = {
   medicines: Medicine[];
   storage: StorageItem[];
   staffMembers: StaffMember[];
+  historicalRecords: HistoricalRecord[];
 };
 
 const createStorage = (beds: number, icu: number, city: string): StorageItem[] => [
@@ -76,6 +78,14 @@ const createStorage = (beds: number, icu: number, city: string): StorageItem[] =
 const createStaffMembers = (city: string): StaffMember[] => [
   { id: Date.now() - 3, name: "Dr. Ananya Rao", role: "Emergency Physician", shiftTime: "08:00-16:00", address: `Staff quarters, ${city}`, status: "On Duty" },
   { id: Date.now() - 2, name: "Nurse Vikram Shah", role: "ICU Nurse", shiftTime: "14:00-22:00", address: `Nursing hostel, ${city}`, status: "Standby" },
+];
+
+const createHistoricalRecords = (occupancy: number, icuOccupancy: number): HistoricalRecord[] => [
+  { day: "Mon", inflow: Math.round(58 + occupancy * 0.38), bedUse: occupancy - 4, icuUse: icuOccupancy - 3, staffLoad: 66, seasonalIndex: 0.94 },
+  { day: "Tue", inflow: Math.round(64 + occupancy * 0.42), bedUse: occupancy - 1, icuUse: icuOccupancy, staffLoad: 71, seasonalIndex: 1.02 },
+  { day: "Wed", inflow: Math.round(70 + occupancy * 0.45), bedUse: occupancy + 2, icuUse: icuOccupancy + 1, staffLoad: 76, seasonalIndex: 1.08 },
+  { day: "Thu", inflow: Math.round(62 + occupancy * 0.44), bedUse: occupancy, icuUse: icuOccupancy + 2, staffLoad: 73, seasonalIndex: 1.04 },
+  { day: "Fri", inflow: Math.round(78 + occupancy * 0.48), bedUse: occupancy + 3, icuUse: icuOccupancy + 4, staffLoad: 82, seasonalIndex: 1.16 },
 ];
 
 const initialHospitals: HospitalRecord[] = [
@@ -102,6 +112,7 @@ const initialHospitals: HospitalRecord[] = [
     ],
     storage: createStorage(820, 92, "Nagpur"),
     staffMembers: createStaffMembers("Nagpur"),
+    historicalRecords: createHistoricalRecords(78, 84),
   },
   {
     id: 2,
@@ -124,6 +135,7 @@ const initialHospitals: HospitalRecord[] = [
     ],
     storage: createStorage(2478, 312, "New Delhi"),
     staffMembers: createStaffMembers("New Delhi"),
+    historicalRecords: createHistoricalRecords(91, 93),
   },
   {
     id: 3,
@@ -146,6 +158,7 @@ const initialHospitals: HospitalRecord[] = [
     ],
     storage: createStorage(620, 76, "Mumbai"),
     staffMembers: createStaffMembers("Mumbai"),
+    historicalRecords: createHistoricalRecords(72, 69),
   },
   {
     id: 4,
@@ -168,6 +181,7 @@ const initialHospitals: HospitalRecord[] = [
     ],
     storage: createStorage(700, 88, "Chennai"),
     staffMembers: createStaffMembers("Chennai"),
+    historicalRecords: createHistoricalRecords(66, 71),
   },
 ];
 
@@ -309,6 +323,11 @@ export default function IcareDashboard() {
   const staffAvailability = Math.max(42, Math.round(100 - hospital.occupancy * 0.42 + scenario.staff * 0.18));
   const adjustedOccupancy = Math.max(20, Math.round(hospital.occupancy - scenario.beds * 0.12 - scenario.diverted * 0.22));
   const adjustedIcu = Math.max(20, Math.round(hospital.icuOccupancy - scenario.beds * 0.05 - scenario.diverted * 0.14));
+  const historicalAverage = Math.round(hospital.historicalRecords.reduce((sum, item) => sum + item.inflow, 0) / hospital.historicalRecords.length);
+  const seasonalIndex = hospital.historicalRecords.at(-1)?.seasonalIndex || 1;
+  const availableBeds = hospital.storage.filter((item) => item.area === "Beds").reduce((sum, item) => sum + item.available, 0) + scenario.beds;
+  const availableIcu = hospital.storage.filter((item) => item.area === "ICU").reduce((sum, item) => sum + item.available, 0) + Math.round(scenario.beds * 0.12);
+  const availableStaffMembers = hospital.staffMembers.filter((member) => member.status !== "Off Duty").length + scenario.staff;
   const lowStock = hospital.medicines.filter((medicine) => medicine.quantity <= medicine.threshold);
   const expiring = hospital.medicines.filter((medicine) => new Date(medicine.expiry).getTime() - Date.now() < 1000 * 60 * 60 * 24 * 90);
   const edPressure = Math.round((adjustedOccupancy + adjustedIcu + (100 - staffAvailability)) / 3);
@@ -321,10 +340,34 @@ export default function IcareDashboard() {
   ];
 
   const forecastData = useMemo(() => [
-    { hour: "6h", patients: Math.round(38 + hospital.occupancy * 0.42 - scenario.diverted), confidence: 94 },
-    { hour: "12h", patients: Math.round(74 + hospital.occupancy * 0.64 - scenario.diverted * 1.8), confidence: 89 },
-    { hour: "24h", patients: Math.round(148 + hospital.occupancy * 1.05 - scenario.diverted * 2.4), confidence: 84 },
-  ], [hospital.occupancy, scenario.diverted]);
+    { hour: "6h", patients: Math.max(0, Math.round((historicalAverage * 0.34 + hospital.occupancy * 0.32) * seasonalIndex - scenario.diverted)), confidence: 94 },
+    { hour: "12h", patients: Math.max(0, Math.round((historicalAverage * 0.62 + hospital.occupancy * 0.48) * seasonalIndex - scenario.diverted * 1.8)), confidence: 89 },
+    { hour: "24h", patients: Math.max(0, Math.round((historicalAverage * 1.15 + hospital.occupancy * 0.82) * seasonalIndex - scenario.diverted * 2.4)), confidence: 84 },
+  ], [historicalAverage, hospital.occupancy, scenario.diverted, seasonalIndex]);
+
+  const allocationPlan = useMemo(() => {
+    const nextInflow = forecastData[2].patients;
+    const requiredBeds = Math.max(0, Math.ceil(nextInflow * 0.58 - availableBeds));
+    const requiredIcu = Math.max(0, Math.ceil(nextInflow * 0.16 - availableIcu));
+    const requiredStaff = Math.max(0, Math.ceil(nextInflow / 9 - availableStaffMembers));
+    const diversionTarget = hospitals
+      .filter((item) => item.id !== hospital.id)
+      .sort((a, b) => a.occupancy + a.icuOccupancy - (b.occupancy + b.icuOccupancy))[0];
+
+    return {
+      requiredBeds,
+      requiredIcu,
+      requiredStaff,
+      diversionTarget,
+      risk: requiredBeds + requiredIcu + requiredStaff > 18 ? "critical" as Risk : requiredBeds + requiredIcu + requiredStaff > 6 ? "warning" as Risk : "safe" as Risk,
+      recommendations: [
+        requiredBeds ? `Open ${requiredBeds} surge beds from ward storage before the 24h peak.` : "Current bed capacity can absorb predicted inflow.",
+        requiredIcu ? `Reserve ${requiredIcu} ICU slots and move stable cases to step-down beds.` : "ICU reserve is adequate for predicted critical arrivals.",
+        requiredStaff ? `Add ${requiredStaff} staff members to intake and ICU shifts.` : "Current active staff covers predicted workload.",
+        diversionTarget ? `Route overflow to ${diversionTarget.name} if ED pressure exceeds ${Math.max(82, edPressure)}%.` : "No diversion target available in network.",
+      ],
+    };
+  }, [availableBeds, availableIcu, availableStaffMembers, edPressure, forecastData, hospital.id, hospitals]);
 
   const usageData = [
     { name: "Beds", value: adjustedOccupancy },
@@ -397,6 +440,7 @@ export default function IcareDashboard() {
       medicines: [],
       storage: createStorage(newHospital.beds, newHospital.icu, newHospital.city),
       staffMembers: createStaffMembers(newHospital.city),
+      historicalRecords: createHistoricalRecords(61, 58),
     }]);
     setEventLog((items) => [`${newHospital.name} added to command network`, ...items]);
   };
@@ -413,9 +457,10 @@ export default function IcareDashboard() {
       `ED pressure: ${edPressure}%`,
       `Staff availability: ${staffAvailability}%`,
       `Forecast 24h: ${forecastData[2].patients} admissions (${forecastData[2].confidence}% confidence)`,
+      `Allocation risk: ${titleCase(allocationPlan.risk)}; beds needed ${allocationPlan.requiredBeds}; ICU needed ${allocationPlan.requiredIcu}; staff needed ${allocationPlan.requiredStaff}`,
       `Low stock medicines: ${lowStock.map((m) => m.name).join(", ") || "None"}`,
       `Storage records: ${hospital.storage.length}; Staff members: ${hospital.staffMembers.length}`,
-      `Top recommendation: ${adjustedIcu > 88 ? "Activate ICU surge and divert stable patients" : "Maintain standby staffing"}`,
+      `Top recommendation: ${allocationPlan.recommendations[0]}`,
     ];
     rows.forEach((row, index) => doc.text(row, 14, 42 + index * 9));
     doc.save(`icare-${hospital.name.replace(/\s+/g, "-").toLowerCase()}-snapshot.pdf`);
@@ -425,6 +470,8 @@ export default function IcareDashboard() {
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ hospital: hospital.name, adjustedOccupancy, adjustedIcu, edPressure, staffAvailability }]), "KPIs");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(forecastData), "Predictions");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ ...allocationPlan, diversionTarget: allocationPlan.diversionTarget?.name || "None" }]), "Allocation Plan");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.historicalRecords), "Historical Records");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.medicines), "Medicine Inventory");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.storage), "Beds ICU Equipment");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.staffMembers), "Staff Members");
@@ -484,13 +531,16 @@ export default function IcareDashboard() {
               </Panel>
               <Panel title="Resource Optimization" icon={Bed}>
                 <div className="h-64"><ResponsiveContainer><BarChart data={usageData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" /><YAxis /><Tooltip /><Bar dataKey="value" radius={[6, 6, 0, 0]} fill="hsl(var(--primary))" /></BarChart></ResponsiveContainer></div>
-                <p className="rounded-md bg-secondary p-3 text-sm text-secondary-foreground">Expected impact: +{scenario.beds} beds and +{scenario.staff} staff reduce ED pressure to {edPressure}%.</p>
+                <div className="space-y-2 text-sm">
+                  <div className={`rounded-md p-3 ${riskClass[allocationPlan.risk]}`}>AI allocation: {allocationPlan.requiredBeds} beds, {allocationPlan.requiredIcu} ICU slots, {allocationPlan.requiredStaff} staff needed for {forecastData[2].patients} predicted admissions.</div>
+                  {allocationPlan.recommendations.slice(0, 3).map((item) => <p key={item} className="rounded-md bg-secondary p-2 text-secondary-foreground">{item}</p>)}
+                </div>
               </Panel>
               <Panel title="Insights & Severity" icon={Sparkles}>
                 <div className="h-48"><ResponsiveContainer><PieChart><Pie data={severity} dataKey="value" nameKey="name" innerRadius={45} outerRadius={75}>{severity.map((_, index) => <Cell key={index} fill={["hsl(var(--critical))", "hsl(var(--warning))", "hsl(var(--safe))"][index]} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer></div>
                 <div className="space-y-2 text-sm">
-                  <p className="rounded-md bg-secondary p-2">{adjustedIcu > 88 ? "Activate surge ICU and divert moderate cases." : "Keep current triage route and standby beds."}</p>
-                  <p className="rounded-md bg-secondary p-2">Redistribute {Math.max(8, Math.round((100 - staffAvailability) / 2))} nurses to emergency intake.</p>
+                  <p className="rounded-md bg-secondary p-2">Historical inflow avg {historicalAverage}/day with seasonal index {seasonalIndex.toFixed(2)} drives current forecast.</p>
+                  <p className="rounded-md bg-secondary p-2">{allocationPlan.recommendations[3]}</p>
                 </div>
               </Panel>
               <Panel title="Medicine Storage & Analysis" icon={Pill}>
