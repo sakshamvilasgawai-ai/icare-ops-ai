@@ -227,18 +227,33 @@ function FloatingCopilot({ hospital, alerts, dispatchAmbulance }: { hospital: Ho
   const [open, setOpen] = useState(false);
   const [minimized, setMinimized] = useState(true);
   const [position, setPosition] = useState({ x: 24, y: 120 });
-  const [messages, setMessages] = useState([
+  const [input, setInput] = useState("");
+  const [messages, setMessages] = useState<{ from: "ai" | "user"; text: string }[]>([
     { from: "ai", text: "ICU capacity may exceed 90% in 4 hours if current inflow continues." },
     { from: "ai", text: "Antibiotic stock requires review before the evening shift." },
   ]);
   const drag = useRef<{ dx: number; dy: number } | null>(null);
 
+  const generateReply = (text: string): string => {
+    const q = text.toLowerCase();
+    if (q.includes("bed")) return `${hospital.name} currently runs at ${hospital.occupancy}% bed occupancy. Consider opening surge beds if inflow rises.`;
+    if (q.includes("icu")) return `ICU is at ${hospital.icuOccupancy}%. Pre-clear step-down candidates to free critical capacity.`;
+    if (q.includes("staff")) return `Active staff strength: ${hospital.staffMembers.filter((s) => s.status !== "Off Duty").length}. Add a surge shift if predicted load exceeds 1:9 ratio.`;
+    if (q.includes("ambulance") || q.includes("dispatch")) return `${hospital.ambulances.filter((a) => a.status === "Available").length} ambulances available. Use the Dispatch button to send the nearest one.`;
+    if (q.includes("medicine") || q.includes("stock")) return `Low-stock medicines: ${hospital.medicines.filter((m) => m.quantity <= m.threshold).map((m) => m.name).join(", ") || "none"}.`;
+    if (q.includes("alert") || q.includes("action")) return alerts[0] ? `Top alert: ${alerts[0]}.` : "All systems are stable.";
+    return `${hospital.name}: ${alerts[0] || "operations are stable"}. Recommended action: activate surge staff and keep one ambulance on standby.`;
+  };
+
   const onSend = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
     setMessages((items) => [
       ...items,
-      { from: "user", text },
-      { from: "ai", text: `${hospital.name}: ${alerts[0] || "operations are stable"}. Recommended action: activate surge staff and keep one ambulance on standby.` },
+      { from: "user", text: trimmed },
+      { from: "ai", text: generateReply(trimmed) },
     ]);
+    setInput("");
   };
 
   if (!open || minimized) {
