@@ -390,6 +390,7 @@ export default function IcareDashboard() {
       `Staff availability: ${staffAvailability}%`,
       `Forecast 24h: ${forecastData[2].patients} admissions (${forecastData[2].confidence}% confidence)`,
       `Low stock medicines: ${lowStock.map((m) => m.name).join(", ") || "None"}`,
+      `Storage records: ${hospital.storage.length}; Staff members: ${hospital.staffMembers.length}`,
       `Top recommendation: ${adjustedIcu > 88 ? "Activate ICU surge and divert stable patients" : "Maintain standby staffing"}`,
     ];
     rows.forEach((row, index) => doc.text(row, 14, 42 + index * 9));
@@ -401,6 +402,8 @@ export default function IcareDashboard() {
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet([{ hospital: hospital.name, adjustedOccupancy, adjustedIcu, edPressure, staffAvailability }]), "KPIs");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(forecastData), "Predictions");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.medicines), "Medicine Inventory");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.storage), "Beds ICU Equipment");
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.staffMembers), "Staff Members");
     XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(hospital.ambulances), "Ambulances");
     XLSX.writeFile(workbook, `icare-${hospital.name.replace(/\s+/g, "-").toLowerCase()}-snapshot.xlsx`);
   };
