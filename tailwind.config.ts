@@ -19,6 +19,18 @@ export default {
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
+        panel: "hsl(var(--panel))",
+        "panel-foreground": "hsl(var(--panel-foreground))",
+        surface: "hsl(var(--surface))",
+        "surface-foreground": "hsl(var(--surface-foreground))",
+        safe: "hsl(var(--safe))",
+        "safe-foreground": "hsl(var(--safe-foreground))",
+        warning: "hsl(var(--warning))",
+        "warning-foreground": "hsl(var(--warning-foreground))",
+        critical: "hsl(var(--critical))",
+        "critical-foreground": "hsl(var(--critical-foreground))",
+        info: "hsl(var(--info))",
+        "info-foreground": "hsl(var(--info-foreground))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
@@ -64,6 +76,14 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
+        "float-pulse": {
+          "0%, 100%": { transform: "translate3d(0, 0, 0) scale(1)" },
+          "50%": { transform: "translate3d(0, -6px, 0) scale(1.015)" },
+        },
+        "soft-enter": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
         "accordion-down": {
           from: {
             height: "0",
@@ -82,6 +102,8 @@ export default {
         },
       },
       animation: {
+        "float-pulse": "float-pulse 4s ease-in-out infinite",
+        "soft-enter": "soft-enter 0.45s ease-out both",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
