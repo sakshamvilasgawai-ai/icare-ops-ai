@@ -275,6 +275,8 @@ export default function IcareDashboard() {
   const [scenario, setScenario] = useState({ beds: 0, staff: 0, diverted: 0 });
   const [newMed, setNewMed] = useState({ name: "", quantity: 0, threshold: 50, category: "General", expiry: "2026-12-31" });
   const [newHospital, setNewHospital] = useState({ name: "", state: "Karnataka", city: "Bengaluru", beds: 400, icu: 48, staff: 260 });
+  const [newStorage, setNewStorage] = useState({ area: "Equipment" as StorageArea, name: "", quantity: 1, available: 1, location: "Central store", address: "" });
+  const [newStaff, setNewStaff] = useState({ name: "", role: "Nurse", shiftTime: "08:00-16:00", address: "", status: "On Duty" as StaffMember["status"] });
   const [eventLog, setEventLog] = useState<string[]>(["AI watchtower active across selected region", "Morning shift validated 18 minutes ago"]);
 
   const hospital = hospitals.find((item) => item.id === selectedId) || hospitals[0];
@@ -339,6 +341,21 @@ export default function IcareDashboard() {
 
   const deleteMedicine = (id: number) => updateHospital((record) => ({ ...record, medicines: record.medicines.filter((medicine) => medicine.id !== id) }));
 
+  const addStorageItem = () => {
+    if (!newStorage.name.trim()) return;
+    updateHospital((record) => ({
+      ...record,
+      storage: [...record.storage, { id: Date.now(), ...newStorage, updatedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) }],
+    }));
+    setNewStorage({ area: "Equipment", name: "", quantity: 1, available: 1, location: "Central store", address: "" });
+  };
+
+  const addStaffMember = () => {
+    if (!newStaff.name.trim()) return;
+    updateHospital((record) => ({ ...record, staffMembers: [...record.staffMembers, { id: Date.now(), ...newStaff }] }));
+    setNewStaff({ name: "", role: "Nurse", shiftTime: "08:00-16:00", address: "", status: "On Duty" });
+  };
+
   const addHospital = () => {
     if (!newHospital.name.trim()) return;
     setHospitals((items) => [...items, {
@@ -354,6 +371,8 @@ export default function IcareDashboard() {
       nurses: Math.round(newHospital.staff * 0.68),
       ambulances: [{ id: `${newHospital.city.slice(0, 2).toUpperCase()}-NEW-1`, driver: "Unassigned", status: "Available", location: "Main gate", eta: 10, performance: 80 }],
       medicines: [],
+      storage: createStorage(newHospital.beds, newHospital.icu, newHospital.city),
+      staffMembers: createStaffMembers(newHospital.city),
     }]);
     setEventLog((items) => [`${newHospital.name} added to command network`, ...items]);
   };
