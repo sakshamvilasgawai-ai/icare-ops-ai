@@ -210,8 +210,8 @@ function Kpi({ label, value, risk, icon: Icon }: { label: string; value: string;
 }
 
 function FloatingCopilot({ hospital, alerts, dispatchAmbulance }: { hospital: HospitalRecord; alerts: string[]; dispatchAmbulance: () => void }) {
-  const [open, setOpen] = useState(true);
-  const [minimized, setMinimized] = useState(false);
+  const [open, setOpen] = useState(false);
+  const [minimized, setMinimized] = useState(true);
   const [position, setPosition] = useState({ x: 24, y: 120 });
   const [messages, setMessages] = useState([
     { from: "ai", text: "ICU capacity may exceed 90% in 4 hours if current inflow continues." },
@@ -226,6 +226,30 @@ function FloatingCopilot({ hospital, alerts, dispatchAmbulance }: { hospital: Ho
       { from: "ai", text: `${hospital.name}: ${alerts[0] || "operations are stable"}. Recommended action: activate surge staff and keep one ambulance on standby.` },
     ]);
   };
+
+  if (!open || minimized) {
+    return (
+      <button
+        aria-label="Open Icare Co-pilot"
+        className="fixed z-50 flex h-11 w-11 items-center justify-center rounded-full border border-primary/20 bg-primary text-primary-foreground shadow-xl reduced-motion-safe"
+        style={{ left: position.x, top: position.y }}
+        onClick={() => {
+          setOpen(true);
+          setMinimized(false);
+        }}
+        onPointerMove={(event) => {
+          if (!drag.current) return;
+          setPosition({ x: Math.max(8, event.clientX - drag.current.dx), y: Math.max(8, event.clientY - drag.current.dy) });
+        }}
+        onPointerDown={(event) => {
+          drag.current = { dx: event.clientX - position.x, dy: event.clientY - position.y };
+        }}
+        onPointerUp={() => (drag.current = null)}
+      >
+        <Bot className="h-5 w-5 animate-float-pulse" />
+      </button>
+    );
+  }
 
   return (
     <div
@@ -246,7 +270,7 @@ function FloatingCopilot({ hospital, alerts, dispatchAmbulance }: { hospital: Ho
       >
         <div className="flex items-center gap-2"><Bot className="h-5 w-5 animate-float-pulse" /><span className="font-semibold">Icare Co-pilot</span></div>
         <div className="flex gap-1">
-          <button aria-label="Minimize assistant" className="rounded-md p-1 hover:bg-primary-foreground/15" onClick={() => setMinimized((v) => !v)}><Minus className="h-4 w-4" /></button>
+          <button aria-label="Minimize assistant" className="rounded-md p-1 hover:bg-primary-foreground/15" onClick={() => setMinimized(true)}><Minus className="h-4 w-4" /></button>
           <button aria-label="Close assistant" className="rounded-md p-1 hover:bg-primary-foreground/15" onClick={() => setOpen(false)}><X className="h-4 w-4" /></button>
         </div>
       </div>
