@@ -47,6 +47,9 @@ type Risk = "safe" | "warning" | "critical";
 type AmbulanceStatus = "Available" | "Busy" | "En Route";
 type Medicine = { id: number; name: string; category: string; quantity: number; threshold: number; expiry: string; usage: number[] };
 type AmbulanceUnit = { id: string; driver: string; status: AmbulanceStatus; location: string; eta: number; performance: number };
+type StorageArea = "Beds" | "ICU" | "Equipment";
+type StorageItem = { id: number; area: StorageArea; name: string; quantity: number; available: number; location: string; address: string; updatedAt: string };
+type StaffMember = { id: number; name: string; role: string; shiftTime: string; address: string; status: "On Duty" | "Standby" | "Off Duty" };
 type HospitalRecord = {
   id: number;
   name: string;
@@ -60,7 +63,20 @@ type HospitalRecord = {
   nurses: number;
   ambulances: AmbulanceUnit[];
   medicines: Medicine[];
+  storage: StorageItem[];
+  staffMembers: StaffMember[];
 };
+
+const createStorage = (beds: number, icu: number, city: string): StorageItem[] => [
+  { id: beds + icu + 1, area: "Beds", name: "General ward beds", quantity: beds, available: Math.round(beds * 0.22), location: "Ward block A", address: `Main campus, ${city}`, updatedAt: "08:00" },
+  { id: beds + icu + 2, area: "ICU", name: "ICU beds with monitors", quantity: icu, available: Math.max(2, Math.round(icu * 0.16)), location: "Critical care unit", address: `ICU tower, ${city}`, updatedAt: "08:15" },
+  { id: beds + icu + 3, area: "Equipment", name: "Ventilators", quantity: Math.round(icu * 0.55), available: Math.max(1, Math.round(icu * 0.12)), location: "Equipment store", address: `Biomedical wing, ${city}`, updatedAt: "08:30" },
+];
+
+const createStaffMembers = (city: string): StaffMember[] => [
+  { id: Date.now() - 3, name: "Dr. Ananya Rao", role: "Emergency Physician", shiftTime: "08:00-16:00", address: `Staff quarters, ${city}`, status: "On Duty" },
+  { id: Date.now() - 2, name: "Nurse Vikram Shah", role: "ICU Nurse", shiftTime: "14:00-22:00", address: `Nursing hostel, ${city}`, status: "Standby" },
+];
 
 const initialHospitals: HospitalRecord[] = [
   {
