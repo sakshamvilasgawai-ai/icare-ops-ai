@@ -112,6 +112,7 @@ const initialHospitals: HospitalRecord[] = [
     ],
     storage: createStorage(820, 92, "Nagpur"),
     staffMembers: createStaffMembers("Nagpur"),
+    historicalRecords: createHistoricalRecords(78, 84),
   },
   {
     id: 2,
@@ -134,6 +135,7 @@ const initialHospitals: HospitalRecord[] = [
     ],
     storage: createStorage(2478, 312, "New Delhi"),
     staffMembers: createStaffMembers("New Delhi"),
+    historicalRecords: createHistoricalRecords(91, 93),
   },
   {
     id: 3,
@@ -156,6 +158,7 @@ const initialHospitals: HospitalRecord[] = [
     ],
     storage: createStorage(620, 76, "Mumbai"),
     staffMembers: createStaffMembers("Mumbai"),
+    historicalRecords: createHistoricalRecords(72, 69),
   },
   {
     id: 4,
@@ -178,6 +181,7 @@ const initialHospitals: HospitalRecord[] = [
     ],
     storage: createStorage(700, 88, "Chennai"),
     staffMembers: createStaffMembers("Chennai"),
+    historicalRecords: createHistoricalRecords(66, 71),
   },
 ];
 
