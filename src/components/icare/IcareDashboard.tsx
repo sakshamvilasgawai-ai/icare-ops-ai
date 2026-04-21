@@ -371,11 +371,20 @@ export default function IcareDashboard() {
     ...eventLog.slice(0, 2),
   ];
 
-  const forecastData = useMemo(() => [
-    { hour: "6h", patients: Math.max(0, Math.round((historicalAverage * 0.34 + hospital.occupancy * 0.32) * seasonalIndex - scenario.diverted)), confidence: 94 },
-    { hour: "12h", patients: Math.max(0, Math.round((historicalAverage * 0.62 + hospital.occupancy * 0.48) * seasonalIndex - scenario.diverted * 1.8)), confidence: 89 },
-    { hour: "24h", patients: Math.max(0, Math.round((historicalAverage * 1.15 + hospital.occupancy * 0.82) * seasonalIndex - scenario.diverted * 2.4)), confidence: 84 },
-  ], [historicalAverage, hospital.occupancy, scenario.diverted, seasonalIndex]);
+  const forecastData = useMemo(() => {
+    const capacity = Math.max(1, hospital.beds);
+    const horizons = [
+      { hour: "6h", base: historicalAverage * 0.34 + hospital.occupancy * 0.32, divertWeight: 1, confidence: 94 },
+      { hour: "12h", base: historicalAverage * 0.62 + hospital.occupancy * 0.48, divertWeight: 1.8, confidence: 89 },
+      { hour: "24h", base: historicalAverage * 1.15 + hospital.occupancy * 0.82, divertWeight: 2.4, confidence: 84 },
+    ];
+    return horizons.map(({ hour, base, divertWeight, confidence }) => {
+      const patients = Math.max(0, Math.round(base * seasonalIndex - scenario.diverted * divertWeight));
+      const load = Math.round((patients / capacity) * 220 + hospital.occupancy * 0.3);
+      const risk = getRisk(load);
+      return { hour, patients, confidence, load, risk };
+    });
+  }, [historicalAverage, hospital.beds, hospital.occupancy, scenario.diverted, seasonalIndex]);
 
   const allocationPlan = useMemo(() => {
     const nextInflow = forecastData[2].patients;
