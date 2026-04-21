@@ -50,6 +50,7 @@ type AmbulanceUnit = { id: string; driver: string; status: AmbulanceStatus; loca
 type StorageArea = "Beds" | "ICU" | "Equipment";
 type StorageItem = { id: number; area: StorageArea; name: string; quantity: number; available: number; location: string; address: string; updatedAt: string };
 type StaffMember = { id: number; name: string; role: string; shiftTime: string; address: string; status: "On Duty" | "Standby" | "Off Duty" };
+type HistoricalRecord = { day: string; inflow: number; bedUse: number; icuUse: number; staffLoad: number; seasonalIndex: number };
 type HospitalRecord = {
   id: number;
   name: string;
@@ -65,6 +66,7 @@ type HospitalRecord = {
   medicines: Medicine[];
   storage: StorageItem[];
   staffMembers: StaffMember[];
+  historicalRecords: HistoricalRecord[];
 };
 
 const createStorage = (beds: number, icu: number, city: string): StorageItem[] => [
@@ -76,6 +78,14 @@ const createStorage = (beds: number, icu: number, city: string): StorageItem[] =
 const createStaffMembers = (city: string): StaffMember[] => [
   { id: Date.now() - 3, name: "Dr. Ananya Rao", role: "Emergency Physician", shiftTime: "08:00-16:00", address: `Staff quarters, ${city}`, status: "On Duty" },
   { id: Date.now() - 2, name: "Nurse Vikram Shah", role: "ICU Nurse", shiftTime: "14:00-22:00", address: `Nursing hostel, ${city}`, status: "Standby" },
+];
+
+const createHistoricalRecords = (occupancy: number, icuOccupancy: number): HistoricalRecord[] => [
+  { day: "Mon", inflow: Math.round(58 + occupancy * 0.38), bedUse: occupancy - 4, icuUse: icuOccupancy - 3, staffLoad: 66, seasonalIndex: 0.94 },
+  { day: "Tue", inflow: Math.round(64 + occupancy * 0.42), bedUse: occupancy - 1, icuUse: icuOccupancy, staffLoad: 71, seasonalIndex: 1.02 },
+  { day: "Wed", inflow: Math.round(70 + occupancy * 0.45), bedUse: occupancy + 2, icuUse: icuOccupancy + 1, staffLoad: 76, seasonalIndex: 1.08 },
+  { day: "Thu", inflow: Math.round(62 + occupancy * 0.44), bedUse: occupancy, icuUse: icuOccupancy + 2, staffLoad: 73, seasonalIndex: 1.04 },
+  { day: "Fri", inflow: Math.round(78 + occupancy * 0.48), bedUse: occupancy + 3, icuUse: icuOccupancy + 4, staffLoad: 82, seasonalIndex: 1.16 },
 ];
 
 const initialHospitals: HospitalRecord[] = [
